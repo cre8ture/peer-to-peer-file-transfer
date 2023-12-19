@@ -1,0 +1,333 @@
+<!-- (A) LOAD PEERJS -->
+<!-- (B) PEER-TO-PEER -->
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Send Files Securely</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+<body>
+    <h1>File Transfer: Send Files</h1>
+    <hr>
+    <div style="display: flex;">
+        <div id="copy-id">
+            <p>Your ID: <span id="peerId"></span>
+                <button id="copyIdButton">Copy</button>
+            <div id="copy-id-status" style="color:green"> </div>
+            </p>
+        </div>
+    </div>
+    <br />
+    <label>
+        <input type="checkbox" id="encryptCheckbox">
+        Encrypt
+    </label>
+
+    <br/>
+    <div id="connection-status-to-peer">You are not connected to anyone yet</div>
+    <br />
+    <div id="encrypt">
+
+        <label>safely share this secret key with the recipient of your file</label>
+
+        <div id="key"></div>
+        <div class="copy-button" style="display: flex;">
+            <button id="copyButton">Copy</button>
+            <div id="copy-status" style="color:green;"> </div>
+        </div>
+    </div>
+    <div id="fileContainer" style="width: 200px; height: 200px; border: 1px solid black;">
+        Drop file here or click to upload
+        <input type="file" id="fileInput" style="display: none;">
+
+    </div>
+
+    <div id="receivedFiles" style="font-size: large; color:green"></div>
+
+    <br/>
+    <br/>
+    <a href="/b" target="_blank">You can recieve files by following this link</a>
+
+</body>
+
+<script>
+
+    const peerId = document.getElementById('peerId');
+    const encryptCheckbox = document.querySelector('#encryptCheckbox');
+    const encrypt = document.querySelector('#encrypt')
+    const copyButton = document.querySelector('#copyButton')
+    const copyStatus = document.querySelector('#copy-status')
+    const copyIdStatus = document.querySelector('#copy-id-status')
+    const copyIdButton = document.querySelector('#copyIdButton')
+    const receivedFiles = document.querySelector('#receivedFiles')
+    const connectionStatusToPeer = document.querySelector('#connection-status-to-peer')
+    encrypt.style.display = 'none';
+    let key;
+    let isEncrypt = false;
+    let myID;
+
+
+    encryptCheckbox.addEventListener('change', async () => {
+        const keyDiv = document.getElementById('key')
+        encrypt.style.display = 'block';
+        isEncrypt = true;
+
+        if (encryptCheckbox.checked) {
+            console.log('The checkbox is checked.');
+          key = generatePassphrase();
+          keyDiv.innerText = key
+            copyStatus.innerText = ''
+            // newConn.send("encryptedFile");
+
+        } else {
+            console.log('The checkbox is not checked.');
+            isEncrypt = false;
+            encrypt.style.display = 'none';
+
+        }
+    })
+
+    copyButton.addEventListener('click', async () => {
+        //   await navigator.clipboard.writeText(key.innerText);
+        await copy(key);
+        copyStatus.innerText = 'copied'
+
+    })
+
+    copyIdButton.addEventListener('click', async () => {
+        await copy(peerId.innerText);
+        copyIdStatus.innerText = 'copied!'
+
+    })
+    async function copy(string) {
+        await navigator.clipboard.writeText(string);
+    }
+
+
+    // generate random string
+    function generateRandomString() {
+
+        const array = new Uint32Array(10);
+        window.crypto.getRandomValues(array);
+        peerId.textContent = Array.from(array, val => ('0' + val.toString(16)).slice(-2)).join('');
+        myID = peerId.textContent;
+    }
+
+
+    // (B1) HANDSHAKE WITH PEER SERVER
+    // const peer = new Peer("PEER-A", {
+    //     host: "localhost",
+    //     port: 9000,
+    //     path: "/myapp"
+    // });
+    const peer = new Peer(myID, {
+        host: "localhost",
+        port: 9000,
+        path: "/myapp"
+    });
+
+    let newConn;
+
+    // (B2) READY
+    peer.on("open", id => {
+        const peerId = document.getElementById('peerId');
+        peerId.innerHTML = id;
+        console.log("Your ID is " + id)
+    });
+
+    // (B3) ON RECEIVING MESSAGE FROM OTHER PEERS
+    // peer.on("connection", conn => {
+
+    //     conn.on("data", data => console.log(data));
+    //     // conn.close();
+    //     // newConn = conn;
+    //     // Connect to PEERB
+    //     newConn = peer.connect('PEERB');
+
+    
+    // });
+
+    peer.on("connection", conn => {
+  // Notify the user when someone tries to connect
+  if (confirm(`User ${conn.peer} is trying to connect. Do you accept?`)) {
+    // If the user accepts the connection, handle the data event
+    conn.on("data", data => console.log(data));
+
+    connectionStatusToPeer.innerText = `Connected to ${conn.peer}`
+
+
+    // Automatically connect back to the peer
+    newConn = peer.connect(conn.peer);
+  } else {
+    // If the user rejects the connection, close it
+    conn.close();
+  }
+});
+
+    const fileContainer = document.getElementById('fileContainer');
+
+    fileContainer.addEventListener('dragover', (event) => {
+        event.preventDefault();
+    });
+
+    fileContainer.addEventListener('drop', (event) => {
+        event.preventDefault();
+        const files = event.dataTransfer.files;
+        // handle files
+    });
+
+    fileContainer.addEventListener('click', () => {
+        document.getElementById('fileInput').click();
+    });
+    // Peer 1 (sender)
+    document.getElementById('fileInput').addEventListener('change', async function () {
+        const file = this.files[0];
+        const reader = new FileReader();
+        reader.onload = async function (event) {
+            console.log("I AM SENDING", event.target.result)
+            if (isEncrypt) {
+                newConn.send("encrypted");
+
+                const blob = new Blob([event.target.result]);
+                console.log("i am key", key)
+                const encryptionKey = await generateKey(key)
+                let encryptedFile = await encryptFile(blob, encryptionKey)
+
+                newConn.send(encryptedFile);
+            }
+            else {
+                newConn.send(event.target.result);
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+
+    //Listen for confirmation message
+    newConn && newConn.on('data', (data) => {
+        if (data === 'File received') {
+            receivedFiles.innerHTML = 'File received successfully';
+            console.log('File sent successfully');
+        }
+    });
+
+
+    // generate key 
+    function generatePassphrase() {
+        const array = new Uint32Array(5);
+        window.crypto.getRandomValues(array);
+        return Array.from(array, val => ('0' + val.toString(16)).slice(-2)).join('');
+    }
+
+    
+    async function generateKey(passphrase) {
+  // Pad the passphrase with the character '0' until it's 32 characters long
+  const paddedPassphrase = passphrase.padEnd(32, '0');
+
+  const encoder = new TextEncoder();
+  const passphraseKey = encoder.encode(paddedPassphrase);
+
+  const key = await window.crypto.subtle.importKey(
+    'raw',
+    passphraseKey,
+    { name: 'AES-CBC', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+
+  return key;
+}
+
+    let salt;
+    async function generateKey2(passphrase) {
+        const encoder = new TextEncoder();
+        const passphraseKey = encoder.encode(passphrase);
+
+        const secretKey = await window.crypto.subtle.importKey(
+            'raw',
+            passphraseKey,
+            'PBKDF2',
+            false,
+            ['deriveKey']
+        );
+
+        salt = window.crypto.getRandomValues(new Uint8Array(16));
+
+        const derivedKey = await window.crypto.subtle.deriveKey(
+            {
+                name: 'PBKDF2',
+                salt: salt,
+                iterations: 100000,
+                hash: 'SHA-256'
+            },
+            secretKey,
+            { name: 'AES-GCM', length: 256 },
+            true,
+            ['encrypt', 'decrypt']
+        );
+
+        return derivedKey;
+    }
+
+
+    async function encryptFile2(file, key) {
+        const reader = new FileReader();
+        const fileArrayBuffer = await new Promise((resolve) => {
+            reader.onload = () => resolve(reader.result);
+            reader.readAsArrayBuffer(file);
+        });
+
+        // Generate an IV
+        const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+        const encryptedContent = await window.crypto.subtle.encrypt(
+            {
+                name: 'AES-GCM',
+                iv: iv
+            },
+            key,
+            fileArrayBuffer
+        );
+
+        // Append the Salt, IV to the encrypted content
+        const combined = new Uint8Array(salt.byteLength + iv.byteLength + encryptedContent.byteLength);
+        combined.set(new Uint8Array(salt));
+        combined.set(new Uint8Array(iv), salt.byteLength);
+        combined.set(new Uint8Array(encryptedContent), salt.byteLength + iv.byteLength);
+
+        return new Blob([combined]);
+    } 
+
+
+
+async function encryptFile(file, key) {
+  const reader = new FileReader();
+  const fileArrayBuffer = await new Promise((resolve) => {
+    reader.onload = () => resolve(reader.result);
+    reader.readAsArrayBuffer(file);
+  });
+
+  const iv = window.crypto.getRandomValues(new Uint8Array(16));
+
+  const encryptedContent = await window.crypto.subtle.encrypt(
+    {
+      name: 'AES-CBC',
+      iv: iv
+    },
+    key,
+    fileArrayBuffer
+  );
+
+  const combined = new Uint8Array(iv.byteLength + encryptedContent.byteLength);
+  combined.set(new Uint8Array(iv));
+  combined.set(new Uint8Array(encryptedContent), iv.byteLength);
+
+  return new Blob([combined]);
+}
+
+</script>
+
+</html>

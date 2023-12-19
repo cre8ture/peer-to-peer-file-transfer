@@ -1,0 +1,21 @@
+<!-- (A) Load PEERJS -->
+<!-- <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script> -->
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+ 
+<!-- (B) PEER-TO-PEER -->
+<script>
+// (B1) HANDSHAKE WITH PEER SERVER
+const peer = new Peer("PEERB", {
+  host: "localhost",
+  port: 9000,
+  path: "/myapp"
+});
+ 
+// (B2) READY - CONNECT & SEND MESSAGE TO PEER A
+peer.on("open", id => {
+  console.log("Your ID is " + id);
+  var conn = peer.connect("PEER-A");
+  conn.on("open", () => conn.send("Hi from PEER-B!"));
+});
+</script>

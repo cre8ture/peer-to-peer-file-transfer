@@ -1,0 +1,7 @@
+body{
+        font-family: 'Roboto', sans-serif;
+}
+#fileContainer:hover {
+    box-shadow: 0 0 10px #00ff00; /* Green glow */
+    scale: 1.02;
+  }

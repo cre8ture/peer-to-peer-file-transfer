@@ -1,0 +1,322 @@
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Peer to Peer File Transfer - Recieve Files</title>
+</head>
+
+<!-- Load PeerJS -->
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+
+<body>
+<!-- Title and ID display -->
+<h1 id="title">Peer to Peer File Transfer - Receive Files</h1>
+<hr/>
+<p id="peerId"></p>
+
+<!-- File input and ID input for sending files -->
+<label for="senderId">Input the Sender ID and click "Find sender"</label>
+<input type="text" id="targetPeerId" placeholder="Enter target peer ID">
+<button id="makeConnection">Find sender</button>
+<!-- <button id="sendFile">Send File</button> -->
+<div id="connectection-status"></div>
+<br/>
+<!-- incoming file -->
+<div id="incomingFile" style="display: none">
+    <h4>Incrypted File</h4>
+    <label>
+        Incoming file needs to be decrypted with secret key shared by the sender of the file
+    </label>
+    <input id="key"> </input>
+    <button id="decryptFile">Decrypt</button>
+    <div id="decrypt-status"></div>
+</div>
+<!-- Display received files -->
+<div id="receivedFiles"></div>
+<br/>
+<br/>
+<a href="/a" target="_blank">You can send files by going to this link</a>
+
+<script>
+    let isEncrypted = false;
+    let key;
+    let encryptedFile;
+    let connCheck;
+    let targetID;
+    let myID;
+    let peer;
+    let isConnected = false;
+    const decryptStatus = document.getElementById('decrypt-status')
+    const decryptButton = document.getElementById('decryptFile')
+    const targetPeerId = document.getElementById('targetPeerId')
+    const peerId = document.getElementById('peerId')
+    const makeConnection = document.getElementById('makeConnection')
+    const connectionStatus = document.getElementById('connectection-status')
+
+    targetPeerId.addEventListener('change', (event) => {
+        targetID = event.target.value
+    })
+
+    makeConnection.addEventListener('click', () => {
+        if(targetID){
+            isConnected = true
+            try{
+            peer.connect(targetID);
+            peer.on("open", () => peer.send("Hi from PEER-B! " + myID));
+        connectionStatus.textContent = 'Connected to '+targetID+'!';
+        connectionStatus.style.color = 'green';
+            }
+            catch(err)
+            {
+                connectionStatus.textContent = 'Not Connected. Check target ID! ' + err;
+        connectionStatus.style.color = 'red';
+            }
+        }
+    })
+    decryptButton.addEventListener('click', async () => {
+        if (isEncrypted) {
+            try {
+                const blobFile = new Blob([encryptedFile]);
+                const decryptedFile = await decryptFile(blobFile, key);
+                decryptStatus.textContent = 'File decrypted successfully';
+                decryptStatus.style.color = 'green';
+
+
+                showOrDownload(decryptedFile)
+
+                // Handle the decrypted file
+            } catch (error) {
+                decryptStatus.textContent = 'Failed to decrypt file:';
+                decryptStatus.style.color = 'red';
+                console.error('Failed to decrypt file:', error);
+            }
+        }
+    })
+
+    document.getElementById('key').addEventListener('change', async (event) => {
+        key = event.target.value;
+
+    })
+    function showOrDownload(decryptedContent, mimeType, filename) {
+  const decryptedFile = new Blob([decryptedContent], { type: mimeType });
+
+  const reader = new FileReader();
+  reader.onloadend = function() {
+    const img = new Image();
+    img.onload = function() {
+      // If the file is an image, create an img element and append it to the DOM
+      const imgElement = document.createElement('img');
+      imgElement.src = reader.result;
+      document.getElementById('receivedFiles').appendChild(imgElement);
+    };
+    img.onerror = function() {
+      // If the file is not an image, create an a element and click it to download the file
+      const a = document.createElement('a');
+      a.href = reader.result;
+      a.download = filename;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(decryptedFile);
+connCheck.send('File received');
+
+    }
+
+    function generateRandomString() {
+
+const array = new Uint32Array(10);
+window.crypto.getRandomValues(array);
+const peerId_new = Array.from(array, val => ('0' + val.toString(16)).slice(-2)).join('');
+myID = peerId_new;
+peerId.textContent = "Your ID is: " + peerId_new;
+}
+
+    // Handshake with Peer server
+    // const peer = new Peer("PEERB", {
+    //     host: "localhost",
+    //     port: 9000,
+    //     path: "/myapp"
+    // });
+    peer = new Peer(generateRandomString(), {
+        host: "localhost",
+        port: 9000,
+        path: "/myapp"
+    });
+    
+
+    // Ready - display ID and set up file sending
+    peer.on("open", id => {
+        if(isConnected){
+            try{
+        var conn = peer.connect("PEER-A");
+        conn.on("open", () => conn.send("Hi from PEER-B! " + myID));
+        connectionStatus.textContent = 'Connected to '+targetID+'!';
+        connectionStatus.style.color = 'green';
+            }
+            catch(err)
+            {
+                connectionStatus.textContent = 'Not Connected. Check target ID!';
+        connectionStatus.style.color = 'red';
+            }
+        }
+    
+    
+        // document.getElementById('peerId').textContent = "Your ID is " + id;
+        // document.getElementById('sendFile').addEventListener('click', () => {
+        //     const fileInput = document.getElementById('fileInput');
+        // const targetPeerId = document.getElementById('targetPeerId').value;
+
+        //     if (fileInput.files.length > 0) {// && targetPeerId) {
+        //         //   const conn = peer.connect(targetPeerId);
+        //         conn.on('open', () => {
+        //             const file = fileInput.files[0];
+        //             const reader = new FileReader();
+        //             reader.onload = (event) => {
+        //                 conn.send(event.target.result);
+        //             };
+        //             reader.readAsDataURL(file);
+        //         });
+        //     }
+        // });
+    });
+
+    // On receiving a connection
+    peer.on("connection", async conn => {
+        conn.on("data", async data => {
+            // Display received file
+            connCheck = conn
+            console.log("WE GOT THE DATA THANKS!", data);
+            if (data === "encrypted") {
+                const incomingFileDiv = document.getElementById('incomingFile')
+                incomingFileDiv.style.display = 'block';
+                isEncrypted = true;
+            }
+            else {
+                const dataFile = data
+
+                if (isEncrypted) {
+                    encryptedFile = dataFile;
+                    // const file = await decryptFile(dataFile, document.getElementById('key').value);
+                }
+                else{
+                const img = document.createElement('img');
+                    
+                img.src = data;
+                document.getElementById('receivedFiles').appendChild(img);
+                conn.send('File received');
+                showOrDownload(data)
+            }
+                // Send confirmation message
+                // conn.send('File received');
+            }
+        });
+    });
+
+
+
+    async function decryptFile(file, passphrase) {
+        const reader = new FileReader();
+        const fileArrayBuffer = await new Promise((resolve) => {
+            reader.onload = () => resolve(reader.result);
+            reader.readAsArrayBuffer(file);
+        });
+
+        const iv = fileArrayBuffer.slice(0, 16);
+        const encryptedContent = fileArrayBuffer.slice(16);
+
+        const key = await generateKey(passphrase);
+
+        const decryptedContent = await window.crypto.subtle.decrypt(
+            {
+                name: 'AES-CBC',
+                iv: new Uint8Array(iv)
+            },
+            key,
+            encryptedContent
+        );
+
+        return new Blob([decryptedContent]);
+    }
+
+    async function generateKey(passphrase) {
+  const encoder = new TextEncoder();
+  const passphraseKey = encoder.encode(passphrase.padEnd(32, '0'));
+
+  const key = await window.crypto.subtle.importKey(
+    'raw',
+    passphraseKey,
+    { name: 'AES-CBC', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+
+  return key;
+}
+
+    async function generateKey2(passphrase, salt) {
+        const encoder = new TextEncoder();
+        const passphraseKey = encoder.encode(passphrase);
+
+        const key = await window.crypto.subtle.importKey(
+            'raw',
+            passphraseKey,
+            'PBKDF2',
+            false,
+            ['deriveKey']
+        );
+
+        // Convert the salt from a string to an ArrayBuffer
+        const saltBuffer = new TextEncoder().encode(salt);
+
+        const derivedKey = await window.crypto.subtle.deriveKey(
+            {
+                name: 'PBKDF2',
+                salt: saltBuffer,
+                iterations: 100000,
+                hash: 'SHA-256'
+            },
+            key,
+            { name: 'AES-GCM', length: 256 },
+            true,
+            ['encrypt', 'decrypt']
+        );
+
+        return derivedKey;
+    }
+    async function decryptFile2(file, passphrase) {
+        const reader = new FileReader();
+        const fileArrayBuffer = await new Promise((resolve) => {
+            reader.onload = () => resolve(reader.result);
+            reader.readAsArrayBuffer(file);
+        });
+
+        // Extract the IV and the encrypted content from the combined data
+        // const iv = fileArrayBuffer.slice(0, 12);
+        // const encryptedContent = fileArrayBuffer.slice(12);
+        // Extract the salt, the IV, and the encrypted content from the combined data
+        const salt = fileArrayBuffer.slice(0, 16);
+        const iv = fileArrayBuffer.slice(16, 28);
+        const encryptedContent = fileArrayBuffer.slice(28);
+
+        // Generate the key from the passphrase
+        const key = await generateKey2(passphrase, new TextDecoder().decode(salt));
+
+        const decryptedContent = await window.crypto.subtle.decrypt(
+            {
+                name: 'AES-GCM',
+                iv: new Uint8Array(iv)
+            },
+            key,
+            encryptedContent
+        );
+
+        return new Blob([decryptedContent]);
+    }
+</script>
+</body>
+</html>
